@@ -1,0 +1,6 @@
+{
+  "name": "CodeMaster - Aprende a Programar Desde Cero",
+  "description": "Plataforma interactiva para aprender C++, Python, JavaScript, Java, Node JS, Rust, SQL, y HTML/CSS con compilador integrado, lecciones desde cero a experto, evaluaciones y certificados de finalización.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
