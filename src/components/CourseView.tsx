@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   CheckCircle2, Lock, Play, RotateCcw, Award, Sparkles, BookOpen, Terminal, 
-  ChevronRight, Lightbulb, Bot, ArrowLeft, ArrowRight, FileText, Check, AlertCircle, Loader2, Eye
+  ChevronRight, Lightbulb, Bot, ArrowLeft, ArrowRight, FileText, Check, AlertCircle, Loader2, Eye,
+  ChevronDown, ChevronUp, PanelRightClose, PanelRightOpen, Layers
 } from 'lucide-react';
 import { Course, LanguageId, Lesson, ExecutionResult, UserStats, CourseProgress } from '../types';
 import { runCode } from '../utils/codeRunners';
@@ -50,6 +51,18 @@ export const CourseView: React.FC<CourseViewProps> = ({
   const [showReportModal, setShowReportModal] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [openLevels, setOpenLevels] = useState<Record<string, boolean>>({
+    'Básico': true,
+    'Medio': true,
+    'Avanzado': true,
+  });
+
+  const toggleLevel = (level: string) => {
+    setOpenLevels(prev => ({
+      ...prev,
+      [level]: !prev[level]
+    }));
+  };
   const [copyPasteWarning, setCopyPasteWarning] = useState<string | null>(null);
 
   const handleCopyPasteBlock = (e: React.SyntheticEvent) => {
@@ -212,12 +225,25 @@ export const CourseView: React.FC<CourseViewProps> = ({
             </button>
           )}
 
-          <button
+          <motion.button
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.95 }}
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="px-3.5 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold border border-slate-200 dark:border-slate-700 shadow-xs"
+            className="px-3.5 py-1.5 rounded-xl bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold border border-slate-200 dark:border-slate-700 shadow-xs flex items-center gap-1.5 transition-all cursor-pointer"
+            title={isSidebarOpen ? "Plegar el temario del curso" : "Desplegar el temario del curso"}
           >
-            {isSidebarOpen ? 'Ocultar Temario' : 'Ver Temario'}
-          </button>
+            {isSidebarOpen ? (
+              <>
+                <PanelRightClose className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                <span className="hidden sm:inline">Plegar Temario</span>
+              </>
+            ) : (
+              <>
+                <PanelRightOpen className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                <span>Ver Temario</span>
+              </>
+            )}
+          </motion.button>
         </div>
       </div>
 
@@ -578,147 +604,417 @@ export const CourseView: React.FC<CourseViewProps> = ({
         </div>
 
         {/* RIGHT SIDEBAR ON THE RIGHT SIDE matching design prompt spec */}
-        {isSidebarOpen && (
-          <aside className="w-full lg:w-80 bg-white dark:bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-200 dark:border-slate-800 flex flex-col h-auto lg:h-full shrink-0 shadow-lg transition-colors">
-            
-            {/* Sidebar Header with Circular Certificate Progress */}
-            <div className="p-5 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-extrabold text-slate-900 dark:text-white">
-                    Temario: {course.title}
-                  </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    {course.totalLessons} Lecciones en total
-                  </p>
-                </div>
-              </div>
-
-              {/* Circular Progress Badge */}
-              <div className="flex items-center gap-3.5 p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/80">
-                <div className="relative flex items-center justify-center shrink-0 w-12 h-12">
-                  <svg width="48" height="48" className="rotate-[-90deg]">
-                    <circle
-                      cx="24"
-                      cy="24"
-                      r="19"
-                      className="stroke-slate-200 dark:stroke-slate-700"
-                      strokeWidth="4"
-                      fill="transparent"
-                    />
-                    <circle
-                      cx="24"
-                      cy="24"
-                      r="19"
-                      className="stroke-indigo-600 dark:stroke-indigo-400 transition-all duration-500 ease-out"
-                      strokeWidth="4"
-                      strokeDasharray={2 * Math.PI * 19}
-                      strokeDashoffset={2 * Math.PI * 19 * (1 - progressPercent / 100)}
-                      strokeLinecap="round"
-                      fill="transparent"
-                    />
-                  </svg>
-                  <span className="absolute text-xs font-black text-slate-900 dark:text-white">
-                    {progressPercent}%
-                  </span>
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1 text-xs font-bold text-slate-800 dark:text-slate-200">
-                    <Award className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                    <span>Avance de Certificado</span>
+        <AnimatePresence mode="wait">
+          {isSidebarOpen ? (
+            <motion.aside
+              key="sidebar-expanded"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.2 }}
+              className="w-full lg:w-80 bg-white dark:bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-200 dark:border-slate-800 flex flex-col h-auto lg:h-full shrink-0 shadow-lg transition-colors"
+            >
+              
+              {/* Sidebar Header with Circular Certificate Progress */}
+              <div className="p-5 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-extrabold text-slate-900 dark:text-white flex items-center gap-2">
+                      <BookOpen className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                      <span>Temario: {course.title}</span>
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      {course.totalLessons} Lecciones en total
+                    </p>
                   </div>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5 leading-tight">
-                    {progressPercent === 100 ? (
-                      <span className="text-emerald-600 dark:text-emerald-400 font-bold">¡Felicidades! Certificado disponible.</span>
-                    ) : (
-                      <>Te faltan <strong className="text-indigo-600 dark:text-indigo-400 font-bold">{course.totalLessons - completedCount}</strong> {course.totalLessons - completedCount === 1 ? 'lección' : 'lecciones'} para tu certificado de {course.title}.</>
-                    )}
-                  </p>
+
+                  <motion.button
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => setIsSidebarOpen(false)}
+                    className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+                    title="Plegar Temario"
+                  >
+                    <PanelRightClose className="w-4 h-4" />
+                  </motion.button>
+                </div>
+
+                {/* Circular Progress Badge */}
+                <div className="flex items-center gap-3.5 p-3.5 bg-slate-50 dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/80">
+                  <div className="relative flex items-center justify-center shrink-0 w-12 h-12">
+                    <svg width="48" height="48" className="rotate-[-90deg]">
+                      <circle
+                        cx="24"
+                        cy="24"
+                        r="19"
+                        className="stroke-slate-200 dark:stroke-slate-700"
+                        strokeWidth="4"
+                        fill="transparent"
+                      />
+                      <circle
+                        cx="24"
+                        cy="24"
+                        r="19"
+                        className="stroke-indigo-600 dark:stroke-indigo-400 transition-all duration-500 ease-out"
+                        strokeWidth="4"
+                        strokeDasharray={2 * Math.PI * 19}
+                        strokeDashoffset={2 * Math.PI * 19 * (1 - progressPercent / 100)}
+                        strokeLinecap="round"
+                        fill="transparent"
+                      />
+                    </svg>
+                    <span className="absolute text-xs font-black text-slate-900 dark:text-white">
+                      {progressPercent}%
+                    </span>
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1 text-xs font-bold text-slate-800 dark:text-slate-200">
+                      <Award className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                      <span>Avance de Certificado</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5 leading-tight">
+                      {progressPercent === 100 ? (
+                        <span className="text-emerald-600 dark:text-emerald-400 font-bold">¡Felicidades! Certificado disponible.</span>
+                      ) : (
+                        <>Te faltan <strong className="text-indigo-600 dark:text-indigo-400 font-bold">{course.totalLessons - completedCount}</strong> {course.totalLessons - completedCount === 1 ? 'lección' : 'lecciones'} para tu certificado de {course.title}.</>
+                      )}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Lessons Navigation List */}
-            <div className="flex-1 overflow-y-auto">
-              {course.lessons.map((lesson) => {
-                const completed = isLessonCompleted(lesson.id);
-                const unlocked = isLessonUnlocked(lesson.id);
-                const isActive = lesson.id === activeLessonId;
-
-                return (
-                  <motion.button
-                    key={lesson.id}
-                    id={`lesson-item-${lesson.id}`}
-                    disabled={!unlocked}
-                    whileHover={unlocked ? { x: 4, scale: 1.01 } : {}}
-                    whileTap={unlocked ? { scale: 0.98 } : {}}
-                    onClick={() => {
-                      if (unlocked) {
-                        setActiveLessonId(lesson.id);
-                        setActiveTab('theory');
-                      }
-                    }}
-                    className={`w-full text-left px-6 py-4 flex items-start space-x-4 border-b border-slate-100 dark:border-slate-800/60 transition-colors ${
-                      isActive
-                        ? 'border-l-4 border-indigo-600 bg-indigo-50/50 dark:bg-indigo-950/40 text-indigo-900 dark:text-indigo-200 font-bold'
-                        : completed
-                        ? 'bg-green-50/50 dark:bg-green-950/20 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-900 dark:text-slate-200'
-                        : unlocked
-                        ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-800 dark:text-slate-200'
-                        : 'opacity-60 text-slate-500 dark:text-slate-500 cursor-not-allowed'
-                    }`}
+              {/* Quick Expand / Collapse Controls */}
+              <div className="px-5 py-2.5 bg-slate-50 dark:bg-slate-950 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                <span className="flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-indigo-500" />
+                  Niveles del Curso
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setOpenLevels({ 'Básico': true, 'Medio': true, 'Avanzado': true })}
+                    className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer"
                   >
-                    {/* Status Icon */}
-                    <div className="mt-0.5 shrink-0">
+                    Expandir
+                  </button>
+                  <span>•</span>
+                  <button
+                    onClick={() => setOpenLevels({ 'Básico': false, 'Medio': false, 'Avanzado': false })}
+                    className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer"
+                  >
+                    Plegar
+                  </button>
+                </div>
+              </div>
+
+              {/* Lessons Navigation List grouped by Collapsible Levels */}
+              <div className="flex-1 overflow-y-auto">
+                {['Básico', 'Medio', 'Avanzado'].map((levelName) => {
+                  const levelLessons = course.lessons.filter(l => l.level === levelName);
+                  if (levelLessons.length === 0) return null;
+
+                  const isLevelOpen = openLevels[levelName] ?? true;
+                  const levelCompletedCount = levelLessons.filter(l => isLessonCompleted(l.id)).length;
+
+                  return (
+                    <div key={levelName} className="border-b border-slate-200/80 dark:border-slate-800">
+                      {/* Level Header Accordion Toggle */}
+                      <button
+                        onClick={() => toggleLevel(levelName)}
+                        className="w-full px-5 py-2.5 bg-slate-100/90 dark:bg-slate-800/80 hover:bg-slate-200/70 dark:hover:bg-slate-800 flex items-center justify-between text-left transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          {isLevelOpen ? (
+                            <ChevronDown className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4 text-slate-400 shrink-0" />
+                          )}
+                          <span className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                            Nivel {levelName}
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-900 px-2 py-0.5 rounded-full border border-slate-200 dark:border-slate-700 shadow-xs">
+                          {levelCompletedCount}/{levelLessons.length}
+                        </span>
+                      </button>
+
+                      {/* Level Lessons Content */}
+                      <AnimatePresence initial={false}>
+                        {isLevelOpen && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="overflow-hidden"
+                          >
+                            {levelLessons.map((lesson) => {
+                              const completed = isLessonCompleted(lesson.id);
+                              const unlocked = isLessonUnlocked(lesson.id);
+                              const isActive = lesson.id === activeLessonId;
+
+                              return (
+                                <motion.button
+                                  key={lesson.id}
+                                  id={`lesson-item-${lesson.id}`}
+                                  disabled={!unlocked}
+                                  whileHover={unlocked ? { x: 4, scale: 1.01 } : {}}
+                                  whileTap={unlocked ? { scale: 0.98 } : {}}
+                                  onClick={() => {
+                                    if (unlocked) {
+                                      setActiveLessonId(lesson.id);
+                                      setActiveTab('theory');
+                                    }
+                                  }}
+                                  className={`w-full text-left px-6 py-3.5 flex items-start space-x-3.5 border-b border-slate-100 dark:border-slate-800/60 transition-colors ${
+                                    isActive
+                                      ? 'border-l-4 border-indigo-600 bg-indigo-50/50 dark:bg-indigo-950/40 text-indigo-900 dark:text-indigo-200 font-bold'
+                                      : completed
+                                      ? 'bg-green-50/50 dark:bg-green-950/20 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-900 dark:text-slate-200'
+                                      : unlocked
+                                      ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-800 dark:text-slate-200'
+                                      : 'opacity-60 text-slate-500 dark:text-slate-500 cursor-not-allowed'
+                                  }`}
+                                >
+                                  {/* Status Icon */}
+                                  <div className="mt-0.5 shrink-0">
+                                    {completed ? (
+                                      <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-white">
+                                        <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                      </div>
+                                    ) : isActive ? (
+                                      <div className="w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center text-white text-[11px] font-bold">
+                                        {lesson.id < 10 ? `0${lesson.id}` : lesson.id}
+                                      </div>
+                                    ) : unlocked ? (
+                                      <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-300 text-[11px] font-bold">
+                                        {lesson.id < 10 ? `0${lesson.id}` : lesson.id}
+                                      </div>
+                                    ) : (
+                                      <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400">
+                                        <Lock className="w-3 h-3" />
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Lesson Text */}
+                                  <div className="flex-1 min-w-0">
+                                    <p className={`text-xs sm:text-sm font-bold ${isActive ? 'text-indigo-700 dark:text-indigo-400' : 'text-slate-900 dark:text-slate-200'}`}>
+                                      {lesson.id < 10 ? `0${lesson.id}` : lesson.id}. {lesson.title}
+                                    </p>
+                                  </div>
+                                </motion.button>
+                              );
+                            })}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  );
+                })}
+
+                {/* Render any un-categorized lessons if present */}
+                {(() => {
+                  const otherLessons = course.lessons.filter(
+                    l => !['Básico', 'Medio', 'Avanzado'].includes(l.level)
+                  );
+                  if (otherLessons.length === 0) return null;
+                  return (
+                    <div>
+                      {otherLessons.map((lesson) => {
+                        const completed = isLessonCompleted(lesson.id);
+                        const unlocked = isLessonUnlocked(lesson.id);
+                        const isActive = lesson.id === activeLessonId;
+                        return (
+                          <motion.button
+                            key={lesson.id}
+                            id={`lesson-item-${lesson.id}`}
+                            disabled={!unlocked}
+                            whileHover={unlocked ? { x: 4, scale: 1.01 } : {}}
+                            whileTap={unlocked ? { scale: 0.98 } : {}}
+                            onClick={() => {
+                              if (unlocked) {
+                                setActiveLessonId(lesson.id);
+                                setActiveTab('theory');
+                              }
+                            }}
+                            className={`w-full text-left px-6 py-3.5 flex items-start space-x-3.5 border-b border-slate-100 dark:border-slate-800/60 transition-colors ${
+                              isActive
+                                ? 'border-l-4 border-indigo-600 bg-indigo-50/50 dark:bg-indigo-950/40 text-indigo-900 dark:text-indigo-200 font-bold'
+                                : completed
+                                ? 'bg-green-50/50 dark:bg-green-950/20 hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-900 dark:text-slate-200'
+                                : unlocked
+                                ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-800 dark:text-slate-200'
+                                : 'opacity-60 text-slate-500 dark:text-slate-500 cursor-not-allowed'
+                            }`}
+                          >
+                            <div className="mt-0.5 shrink-0">
+                              {completed ? (
+                                <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center text-white">
+                                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                </div>
+                              ) : isActive ? (
+                                <div className="w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center text-white text-[11px] font-bold">
+                                  {lesson.id < 10 ? `0${lesson.id}` : lesson.id}
+                                </div>
+                              ) : unlocked ? (
+                                <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-300 text-[11px] font-bold">
+                                  {lesson.id < 10 ? `0${lesson.id}` : lesson.id}
+                                </div>
+                              ) : (
+                                <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400">
+                                  <Lock className="w-3 h-3" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-xs sm:text-sm font-bold ${isActive ? 'text-indigo-700 dark:text-indigo-400' : 'text-slate-900 dark:text-slate-200'}`}>
+                                {lesson.id < 10 ? `0${lesson.id}` : lesson.id}. {lesson.title}
+                              </p>
+                            </div>
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Sidebar Footer Certificate Banner */}
+              {progressPercent === 100 && (
+                <div className="p-6 bg-slate-900 dark:bg-slate-950 text-white border-t border-slate-800">
+                  <button
+                    onClick={() => setShowCertificateModal(true)}
+                    className="w-full flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 py-3 rounded-xl font-bold transition-all shadow-md shadow-indigo-500/20"
+                  >
+                    <Award className="w-5 h-5 text-amber-300" />
+                    <span>Descargar Certificado</span>
+                  </button>
+                </div>
+              )}
+
+            </motion.aside>
+          ) : (
+            /* COLLAPSED MINI RAIL SIDEBAR (Matching reference image with vertical icon list) */
+            <motion.aside
+              key="sidebar-collapsed"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              transition={{ duration: 0.2 }}
+              className="w-16 lg:w-16 bg-white dark:bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-200 dark:border-slate-800 flex flex-col items-center py-4 h-auto lg:h-full shrink-0 shadow-md transition-colors gap-3 z-10"
+            >
+              {/* Top Header Badge & Expand Button */}
+              <div className="flex flex-col items-center gap-2.5 w-full border-b border-slate-100 dark:border-slate-800 pb-3">
+                <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-black text-[11px] shadow-sm shadow-indigo-500/30">
+                  {course.id.toUpperCase().slice(0, 3)}
+                </div>
+
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => setIsSidebarOpen(true)}
+                  className="p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/60 text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer"
+                  title="Desplegar Temario Completo"
+                >
+                  <PanelRightOpen className="w-4 h-4" />
+                </motion.button>
+              </div>
+
+              {/* Circular Progress Badge Small */}
+              <div 
+                className="relative flex items-center justify-center shrink-0 w-9 h-9 cursor-pointer my-1"
+                onClick={() => setIsSidebarOpen(true)}
+                title={`Avance de Temario: ${progressPercent}%`}
+              >
+                <svg width="36" height="36" className="rotate-[-90deg]">
+                  <circle
+                    cx="18"
+                    cy="18"
+                    r="14"
+                    className="stroke-slate-200 dark:stroke-slate-800"
+                    strokeWidth="3"
+                    fill="transparent"
+                  />
+                  <circle
+                    cx="18"
+                    cy="18"
+                    r="14"
+                    className="stroke-indigo-600 dark:stroke-indigo-400 transition-all duration-500 ease-out"
+                    strokeWidth="3"
+                    strokeDasharray={2 * Math.PI * 14}
+                    strokeDashoffset={2 * Math.PI * 14 * (1 - progressPercent / 100)}
+                    strokeLinecap="round"
+                    fill="transparent"
+                  />
+                </svg>
+                <span className="absolute text-[9px] font-black text-slate-900 dark:text-white">
+                  {progressPercent}%
+                </span>
+              </div>
+
+              {/* Collapsed Lesson Icons Bar (Vertical Rail) */}
+              <div className="flex-1 overflow-y-auto w-full px-2 space-y-2 flex flex-col items-center py-1 no-scrollbar">
+                {course.lessons.map((lesson) => {
+                  const completed = isLessonCompleted(lesson.id);
+                  const unlocked = isLessonUnlocked(lesson.id);
+                  const isActive = lesson.id === activeLessonId;
+
+                  return (
+                    <motion.button
+                      key={lesson.id}
+                      disabled={!unlocked}
+                      whileHover={unlocked ? { scale: 1.1 } : {}}
+                      whileTap={unlocked ? { scale: 0.95 } : {}}
+                      onClick={() => {
+                        if (unlocked) {
+                          setActiveLessonId(lesson.id);
+                          setActiveTab('theory');
+                        }
+                      }}
+                      title={`${lesson.id < 10 ? '0' + lesson.id : lesson.id}. ${lesson.title} (${lesson.level})`}
+                      className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+                        isActive
+                          ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 ring-2 ring-indigo-400 font-black'
+                          : completed
+                          ? 'bg-emerald-500 text-white shadow-xs'
+                          : unlocked
+                          ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 font-bold'
+                          : 'bg-slate-100/50 dark:bg-slate-800/40 text-slate-400 dark:text-slate-600 cursor-not-allowed opacity-60'
+                      }`}
+                    >
                       {completed ? (
-                        <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white">
-                          <Check className="w-4 h-4 stroke-[3]" />
-                        </div>
+                        <Check className="w-4 h-4 stroke-[3]" />
                       ) : isActive ? (
-                        <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold">
+                        <span className="text-[11px] font-black">
                           {lesson.id < 10 ? `0${lesson.id}` : lesson.id}
-                        </div>
+                        </span>
                       ) : unlocked ? (
-                        <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-slate-700 dark:text-slate-300 text-xs font-bold">
+                        <span className="text-[11px] font-bold">
                           {lesson.id < 10 ? `0${lesson.id}` : lesson.id}
-                        </div>
+                        </span>
                       ) : (
-                        <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400">
-                          <Lock className="w-3 h-3" />
-                        </div>
+                        <Lock className="w-3.5 h-3.5" />
                       )}
-                    </div>
+                    </motion.button>
+                  );
+                })}
+              </div>
 
-                    {/* Lesson Text */}
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-bold ${isActive ? 'text-indigo-700 dark:text-indigo-400' : 'text-slate-900 dark:text-slate-200'}`}>
-                        {lesson.id < 10 ? `0${lesson.id}` : lesson.id}. {lesson.title}
-                      </p>
-                      <p className={`text-xs ${isActive ? 'text-indigo-500 dark:text-indigo-400 font-semibold' : 'text-slate-500 dark:text-slate-400'}`}>
-                        Nivel {lesson.level}
-                      </p>
-                    </div>
-                  </motion.button>
-                );
-              })}
-            </div>
-
-            {/* Sidebar Footer Certificate Banner */}
-            {progressPercent === 100 && (
-              <div className="p-6 bg-slate-900 dark:bg-slate-950 text-white border-t border-slate-800">
+              {/* Award icon if complete */}
+              {progressPercent === 100 && (
                 <button
                   onClick={() => setShowCertificateModal(true)}
-                  className="w-full flex items-center justify-center space-x-2 bg-indigo-600 hover:bg-indigo-500 py-3 rounded-xl font-bold transition-all shadow-md shadow-indigo-500/20"
+                  className="p-2 rounded-xl bg-amber-500 text-white hover:bg-amber-600 transition-colors cursor-pointer shadow-md shadow-amber-500/20 mt-1"
+                  title="Descargar Certificado"
                 >
-                  <Award className="w-5 h-5 text-amber-300" />
-                  <span>Descargar Certificado</span>
+                  <Award className="w-4 h-4" />
                 </button>
-              </div>
-            )}
+              )}
 
-          </aside>
-        )}
+            </motion.aside>
+          )}
+        </AnimatePresence>
 
       </div>
 
