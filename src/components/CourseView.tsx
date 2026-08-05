@@ -3,9 +3,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   CheckCircle2, Lock, Play, RotateCcw, Award, Sparkles, BookOpen, Terminal, 
   ChevronRight, Lightbulb, Bot, ArrowLeft, ArrowRight, FileText, Check, AlertCircle, Loader2, Eye,
-  ChevronDown, ChevronUp, PanelRightClose, PanelRightOpen, Layers
+  ChevronDown, ChevronUp, PanelRightClose, PanelRightOpen, Layers, Plus, Edit3, Save, X, ShieldAlert
 } from 'lucide-react';
-import { Course, LanguageId, Lesson, ExecutionResult, UserStats, CourseProgress } from '../types';
+import { Course, LanguageId, Lesson, ExecutionResult, UserStats, CourseProgress, UserRole, DifficultyLevel } from '../types';
 import { runCode } from '../utils/codeRunners';
 import { AITutorModal } from './AITutorModal';
 import { CertificateModal } from './CertificateModal';
@@ -14,6 +14,8 @@ import { ReportModal } from './ReportModal';
 interface CourseViewProps {
   course: Course;
   userStats: UserStats;
+  userRole?: UserRole;
+  onUpdateCourse?: (updatedCourse: Course) => void;
   onUpdateProgress: (courseId: LanguageId, lessonId: number, userCode: string, passed: boolean) => void;
   onBackToCatalog: () => void;
 }
@@ -21,6 +23,8 @@ interface CourseViewProps {
 export const CourseView: React.FC<CourseViewProps> = ({
   course,
   userStats,
+  userRole,
+  onUpdateCourse,
   onUpdateProgress,
   onBackToCatalog,
 }) => {
@@ -36,7 +40,133 @@ export const CourseView: React.FC<CourseViewProps> = ({
     return courseProgress.currentLessonId || 1;
   });
 
-  const activeLesson: Lesson = course.lessons.find(l => l.id === activeLessonId) || course.lessons[0];
+  const activeLesson: Lesson = course.lessons.find(l => l.id === activeLessonId) || course.lessons[0] || {
+    id: 1,
+    title: 'Módulo Introductorio',
+    level: 'Básico',
+    durationMinutes: 15,
+    summary: 'Sin lecciones configuradas',
+    theoryMarkdown: '## Sin contenido',
+    codeExamples: [],
+    exercise: { id: 'ex-1', instruction: '', starterCode: '', solutionCode: '', testCases: [] }
+  };
+
+  // Admin module creation / editing state in CourseView
+  const [adminLessonModalMode, setAdminLessonModalMode] = useState<'add' | 'edit' | null>(null);
+  const [targetAdminLessonId, setTargetAdminLessonId] = useState<number | null>(null);
+  const [adminLessonForm, setAdminLessonForm] = useState({
+    title: '',
+    level: 'Básico' as DifficultyLevel,
+    durationMinutes: 15,
+    summary: '',
+    theoryMarkdown: '',
+    starterCode: '',
+    solutionCode: '',
+    hint: ''
+  });
+
+  const handleOpenAddAdminLesson = () => {
+    setAdminLessonModalMode('add');
+    setTargetAdminLessonId(null);
+    setAdminLessonForm({
+      title: '',
+      level: 'Básico',
+      durationMinutes: 20,
+      summary: '',
+      theoryMarkdown: '## Introducción al Módulo\n\nEscribe aquí el contenido teórico para esta lección...',
+      starterCode: '// Código inicial para el estudiante\n',
+      solutionCode: '// Solución esperada\n',
+      hint: 'Revisa la teoría antes de compilar.'
+    });
+  };
+
+  const handleOpenEditAdminLesson = (lesson: Lesson) => {
+    setAdminLessonModalMode('edit');
+    setTargetAdminLessonId(lesson.id);
+    setAdminLessonForm({
+      title: lesson.title,
+      level: lesson.level,
+      durationMinutes: lesson.durationMinutes,
+      summary: lesson.summary,
+      theoryMarkdown: lesson.theoryMarkdown || '',
+      starterCode: lesson.exercise?.starterCode || '',
+      solutionCode: lesson.exercise?.solutionCode || '',
+      hint: lesson.exercise?.hint || ''
+    });
+  };
+
+  const handleSaveAdminLessonModal = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminLessonForm.title.trim() || !onUpdateCourse) return;
+
+    let updatedLessons = [...course.lessons];
+
+    if (adminLessonModalMode === 'add') {
+      const nextId = course.lessons.length > 0
+        ? Math.max(...course.lessons.map(l => l.id)) + 1
+        : 1;
+
+      const newLesson: Lesson = {
+        id: nextId,
+        title: adminLessonForm.title,
+        level: adminLessonForm.level,
+        durationMinutes: Number(adminLessonForm.durationMinutes) || 15,
+        summary: adminLessonForm.summary,
+        theoryMarkdown: adminLessonForm.theoryMarkdown,
+        codeExamples: [
+          {
+            title: 'Ejemplo Práctico',
+            code: adminLessonForm.starterCode || '// Código de demostración',
+            explanation: 'Sigue la estructura básica demostrada.'
+          }
+        ],
+        exercise: {
+          id: `ex-${course.id}-${nextId}`,
+          instruction: `Instrucciones para implementar "${adminLessonForm.title}".`,
+          starterCode: adminLessonForm.starterCode,
+          solutionCode: adminLessonForm.solutionCode,
+          testCases: [
+            {
+              id: `tc-${nextId}-1`,
+              expectedOutput: 'OK',
+              description: 'Validación del programa'
+            }
+          ],
+          hint: adminLessonForm.hint
+        }
+      };
+
+      updatedLessons.push(newLesson);
+      setActiveLessonId(nextId);
+    } else if (adminLessonModalMode === 'edit' && targetAdminLessonId !== null) {
+      updatedLessons = updatedLessons.map(l => {
+        if (l.id !== targetAdminLessonId) return l;
+        return {
+          ...l,
+          title: adminLessonForm.title,
+          level: adminLessonForm.level,
+          durationMinutes: Number(adminLessonForm.durationMinutes) || 15,
+          summary: adminLessonForm.summary,
+          theoryMarkdown: adminLessonForm.theoryMarkdown,
+          exercise: {
+            ...l.exercise,
+            starterCode: adminLessonForm.starterCode,
+            solutionCode: adminLessonForm.solutionCode,
+            hint: adminLessonForm.hint
+          }
+        };
+      });
+    }
+
+    const updatedCourse: Course = {
+      ...course,
+      lessons: updatedLessons,
+      totalLessons: updatedLessons.length
+    };
+
+    onUpdateCourse(updatedCourse);
+    setAdminLessonModalMode(null);
+  };
 
   const [activeTab, setActiveTab] = useState<'theory' | 'compiler' | 'preview'>('theory');
   const [code, setCode] = useState<string>(() => {
@@ -270,9 +400,21 @@ export const CourseView: React.FC<CourseViewProps> = ({
                   {activeLesson.durationMinutes} minutos estimados
                 </span>
               </div>
-              <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white">
-                {activeLesson.title}
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white">
+                  {activeLesson.title}
+                </h2>
+                {userRole === 'admin' && (
+                  <button
+                    onClick={() => handleOpenEditAdminLesson(activeLesson)}
+                    className="p-1.5 rounded-xl bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 text-xs font-bold hover:bg-amber-200 cursor-pointer flex items-center gap-1 shrink-0"
+                    title="Editar este módulo/lección"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Editar Módulo</span>
+                  </button>
+                )}
+              </div>
               <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1 font-medium">
                 {activeLesson.summary}
               </p>
@@ -691,6 +833,16 @@ export const CourseView: React.FC<CourseViewProps> = ({
                   Niveles del Curso
                 </span>
                 <div className="flex items-center gap-2">
+                  {userRole === 'admin' && (
+                    <button
+                      onClick={handleOpenAddAdminLesson}
+                      className="px-2 py-0.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 text-[10px] font-black cursor-pointer flex items-center gap-1 shadow-xs"
+                      title="Agregar un nuevo módulo o lección"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Nuevo Módulo</span>
+                    </button>
+                  )}
                   <button
                     onClick={() => setOpenLevels({ 'Básico': true, 'Medio': true, 'Avanzado': true })}
                     className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors cursor-pointer"
@@ -1066,6 +1218,160 @@ export const CourseView: React.FC<CourseViewProps> = ({
           issueDate: new Date().toLocaleDateString('es-ES')
         }}
       />
+
+      {/* Admin Add / Edit Lesson Modal */}
+      {adminLessonModalMode !== null && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 max-w-2xl w-full border border-slate-200 dark:border-slate-800 shadow-2xl space-y-5 my-8">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+              <div>
+                <h3 className="font-black text-slate-900 dark:text-white text-base">
+                  {adminLessonModalMode === 'add' ? 'Agregar Nuevo Módulo' : `Editar Lección ${targetAdminLessonId}`}
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Curso: <span className="font-bold text-indigo-600 dark:text-indigo-400">{course.title}</span>
+                </p>
+              </div>
+              <button
+                onClick={() => setAdminLessonModalMode(null)}
+                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveAdminLessonModal} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Título del Módulo *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. Programación Orientada a Objetos"
+                    value={adminLessonForm.title}
+                    onChange={(e) => setAdminLessonForm({ ...adminLessonForm, title: e.target.value })}
+                    className="w-full px-4 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Nivel
+                  </label>
+                  <select
+                    value={adminLessonForm.level}
+                    onChange={(e) => setAdminLessonForm({ ...adminLessonForm, level: e.target.value as DifficultyLevel })}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold focus:outline-none cursor-pointer"
+                  >
+                    <option value="Básico">Básico</option>
+                    <option value="Medio">Medio</option>
+                    <option value="Avanzado">Avanzado</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Duración Estimada (min)
+                  </label>
+                  <input
+                    type="number"
+                    min={5}
+                    max={180}
+                    value={adminLessonForm.durationMinutes}
+                    onChange={(e) => setAdminLessonForm({ ...adminLessonForm, durationMinutes: parseInt(e.target.value) || 15 })}
+                    className="w-full px-4 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-bold focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Pista o Ayuda
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Pista de resolución..."
+                    value={adminLessonForm.hint}
+                    onChange={(e) => setAdminLessonForm({ ...adminLessonForm, hint: e.target.value })}
+                    className="w-full px-4 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-medium focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Resumen Ejecutivo
+                </label>
+                <textarea
+                  rows={2}
+                  required
+                  value={adminLessonForm.summary}
+                  onChange={(e) => setAdminLessonForm({ ...adminLessonForm, summary: e.target.value })}
+                  className="w-full px-4 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-medium focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Contenido Teórico Markdown
+                </label>
+                <textarea
+                  rows={5}
+                  value={adminLessonForm.theoryMarkdown}
+                  onChange={(e) => setAdminLessonForm({ ...adminLessonForm, theoryMarkdown: e.target.value })}
+                  className="w-full px-4 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Código Starter
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={adminLessonForm.starterCode}
+                    onChange={(e) => setAdminLessonForm({ ...adminLessonForm, starterCode: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 text-indigo-300 border border-slate-700 text-xs font-mono focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                    Código Solución
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={adminLessonForm.solutionCode}
+                    onChange={(e) => setAdminLessonForm({ ...adminLessonForm, solutionCode: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900 text-emerald-300 border border-slate-700 text-xs font-mono focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-3 flex justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setAdminLessonModalMode(null)}
+                  className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-bold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md cursor-pointer flex items-center gap-2"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Guardar Módulo</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

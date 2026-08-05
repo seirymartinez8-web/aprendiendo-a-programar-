@@ -1,5 +1,39 @@
 export type DifficultyLevel = 'Básico' | 'Medio' | 'Avanzado';
 
+export type UserRole = 'student' | 'admin';
+
+export type AppView = 'login' | 'catalog' | 'course' | 'playground' | 'profile' | 'admin';
+
+export interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  avatarUrl?: string;
+}
+
+export interface StudentRecord {
+  id: string;
+  name: string;
+  email: string;
+  enrolledDate: string;
+  overallGpa: number;
+  completedLessons: number;
+  streakDays: number;
+  certificatesEarned: number;
+  status: 'Activo' | 'Inactivo' | 'Graduado';
+  primaryCourse: LanguageId;
+}
+
+export interface SystemConfig {
+  academyName: string;
+  passingGradeThreshold: number;
+  allowPlaygroundAccess: boolean;
+  enableAiTutor: boolean;
+  maintenanceMode: boolean;
+}
+
+
 export type LanguageId = 
   | 'cpp' 
   | 'python' 

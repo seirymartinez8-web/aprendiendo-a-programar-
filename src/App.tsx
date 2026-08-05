@@ -1,17 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { LanguageId, UserStats, CourseProgress } from './types';
+import { LanguageId, UserStats, CourseProgress, AppView, UserRole, AuthUser, Course } from './types';
 import { COURSES } from './data/coursesIndex';
 import { Header } from './components/Header';
 import { CourseCatalog } from './components/CourseCatalog';
 import { CourseView } from './components/CourseView';
 import { FreePlayground } from './components/FreePlayground';
 import { UserProfileModal } from './components/UserProfileModal';
+import { AdminDashboard } from './components/AdminDashboard';
+import { LoginView } from './components/LoginView';
 
 const USER_STATS_KEY = 'codemaster_user_stats_v1';
 const THEME_KEY = 'codemaster_theme_v1';
+const USER_ROLE_KEY = 'codemaster_user_role_v1';
+const AUTH_USER_KEY = 'codemaster_auth_user_v1';
+const COURSES_STORAGE_KEY = 'codemaster_courses_v2';
 
 const INITIAL_USER_STATS: UserStats = {
-  userName: 'Estudiante',
+  userName: 'Carlos Mendoza',
   streakDays: 3,
   lastActiveDate: new Date().toISOString(),
   totalTimeSpentMinutes: 45,
@@ -29,8 +34,40 @@ const INITIAL_USER_STATS: UserStats = {
 };
 
 export function App() {
-  const [currentView, setCurrentView] = useState<'catalog' | 'course' | 'playground' | 'profile'>('catalog');
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
+    try {
+      const saved = localStorage.getItem(AUTH_USER_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn('Auth user read error:', e);
+    }
+    return null;
+  });
+
+  const [currentView, setCurrentView] = useState<AppView>(() => {
+    if (!currentUser) return 'login';
+    return currentUser.role === 'admin' ? 'admin' : 'catalog';
+  });
+
   const [activeCourseId, setActiveCourseId] = useState<LanguageId | null>(null);
+
+  const [userRole, setUserRole] = useState<UserRole>(() => {
+    if (currentUser) return currentUser.role;
+    return 'student';
+  });
+
+  useEffect(() => {
+    try {
+      if (currentUser) {
+        localStorage.setItem(AUTH_USER_KEY, JSON.stringify(currentUser));
+        localStorage.setItem(USER_ROLE_KEY, currentUser.role);
+      } else {
+        localStorage.removeItem(AUTH_USER_KEY);
+      }
+    } catch (e) {
+      console.warn('Auth user save error:', e);
+    }
+  }, [currentUser]);
 
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     try {
@@ -74,10 +111,48 @@ export function App() {
     }
   }, [userStats]);
 
-  const handleNavigate = (
-    view: 'catalog' | 'course' | 'playground' | 'profile',
-    courseId?: LanguageId
-  ) => {
+  const [courses, setCourses] = useState<Record<LanguageId, Course>>(() => {
+    try {
+      const saved = localStorage.getItem(COURSES_STORAGE_KEY);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.warn('Courses read error:', e);
+    }
+    return COURSES;
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(COURSES_STORAGE_KEY, JSON.stringify(courses));
+    } catch (e) {
+      console.warn('Courses save error:', e);
+    }
+  }, [courses]);
+
+  const handleUpdateCourse = (updatedCourse: Course) => {
+    setCourses((prev) => ({
+      ...prev,
+      [updatedCourse.id]: updatedCourse,
+    }));
+  };
+
+  const handleLogin = (user: AuthUser) => {
+    setCurrentUser(user);
+    setUserRole(user.role);
+    setUserStats(prev => ({ ...prev, userName: user.name }));
+    if (user.role === 'admin') {
+      setCurrentView('admin');
+    } else {
+      setCurrentView('catalog');
+    }
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setCurrentView('login');
+  };
+
+  const handleNavigate = (view: AppView, courseId?: LanguageId) => {
     if (view === 'course' && courseId) {
       setActiveCourseId(courseId);
     }
@@ -87,6 +162,16 @@ export function App() {
   const handleSelectCourse = (courseId: LanguageId) => {
     setActiveCourseId(courseId);
     setCurrentView('course');
+  };
+
+  const handleToggleRole = () => {
+    const nextRole = userRole === 'student' ? 'admin' : 'student';
+    setUserRole(nextRole);
+    if (nextRole === 'admin') {
+      setCurrentView('admin');
+    } else {
+      setCurrentView('catalog');
+    }
   };
 
   const handleUpdateProgress = (
@@ -157,30 +242,52 @@ export function App() {
         totalCertificatesCount={totalCertificatesCount}
         darkMode={darkMode}
         onToggleDarkMode={() => setDarkMode(!darkMode)}
+        userRole={userRole}
+        currentUser={currentUser}
+        onLogout={handleLogout}
       />
 
       <main className="flex-1">
-        {currentView === 'catalog' && (
+        {(currentView === 'login' || !currentUser) && (
+          <LoginView onLogin={handleLogin} />
+        )}
+
+        {currentUser && currentView === 'catalog' && (
           <CourseCatalog userStats={userStats} onSelectCourse={handleSelectCourse} />
         )}
 
-        {currentView === 'course' && activeCourseId && COURSES[activeCourseId] && (
+        {currentUser && currentView === 'course' && activeCourseId && (courses[activeCourseId] || COURSES[activeCourseId]) && (
           <CourseView
-            course={COURSES[activeCourseId]}
+            course={courses[activeCourseId] || COURSES[activeCourseId]}
             userStats={userStats}
+            userRole={userRole}
+            onUpdateCourse={handleUpdateCourse}
             onUpdateProgress={handleUpdateProgress}
             onBackToCatalog={() => setCurrentView('catalog')}
           />
         )}
 
-        {currentView === 'playground' && <FreePlayground />}
+        {currentUser && currentView === 'playground' && <FreePlayground />}
 
-        {currentView === 'profile' && (
+        {currentUser && currentView === 'profile' && (
           <UserProfileModal
             userStats={userStats}
             onUpdateUserName={(newName) => setUserStats(prev => ({ ...prev, userName: newName }))}
             onNavigateToCourse={handleSelectCourse}
             onBackToCatalog={() => setCurrentView('catalog')}
+          />
+        )}
+
+        {currentUser && currentView === 'admin' && (
+          <AdminDashboard
+            userStats={userStats}
+            courses={courses}
+            onUpdateCourse={handleUpdateCourse}
+            onSwitchToStudentView={() => {
+              setUserRole('student');
+              setCurrentView('catalog');
+            }}
+            onNavigateToCourse={handleSelectCourse}
           />
         )}
       </main>
